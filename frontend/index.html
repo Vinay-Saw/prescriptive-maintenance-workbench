@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prescriptive Maintenance Workbench</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .asset-tree::-webkit-scrollbar { width: 6px; }
+    .asset-tree::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+  <div class="flex h-screen overflow-hidden">
+    <aside class="w-80 bg-gray-900 border-r border-gray-800 flex flex-col">
+      <div class="p-4 border-b border-gray-800">
+        <h1 class="text-xl font-semibold tracking-tight">Reliability Console</h1>
+        <p class="text-xs text-gray-400 mt-1">Plant Alpha · 40 assets · Prescriptive</p>
+      </div>
+      <div class="p-3 text-xs uppercase tracking-wider text-gray-500">Assets</div>
+      <div id="asset-list" class="asset-tree flex-1 overflow-y-auto px-2 pb-4 space-y-1"></div>
+      <div class="p-3 border-t border-gray-800 text-xs text-gray-500">
+        Edge scores → Plant work orders<br>Raw waveforms stay in cell
+      </div>
+    </aside>
+    <main class="flex-1 flex flex-col">
+      <header class="h-14 border-b border-gray-800 flex items-center justify-between px-6">
+        <div id="selected-asset" class="font-medium">Select an asset</div>
+        <div class="flex gap-3 text-sm">
+          <span class="px-2 py-1 rounded bg-emerald-900/40 text-emerald-300">Rules + Isolation Forest</span>
+          <span class="px-2 py-1 rounded bg-blue-900/40 text-blue-300">ISO 14224 taxonomy</span>
+        </div>
+      </header>
+      <div class="flex-1 overflow-auto p-6">
+        <div id="trend-panel" class="hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+            <div class="bg-gray-900 rounded-lg p-4 border border-gray-800">
+              <div class="text-xs text-gray-400">Vibration RMS</div>
+              <div id="rms-value" class="text-2xl font-mono mt-1">—</div>
+            </div>
+            <div class="bg-gray-900 rounded-lg p-4 border border-gray-800">
+              <div class="text-xs text-gray-400">Kurtosis</div>
+              <div id="kurt-value" class="text-2xl font-mono mt-1">—</div>
+            </div>
+            <div class="bg-gray-900 rounded-lg p-4 border border-gray-800">
+              <div class="text-xs text-gray-400">Sensor Status</div>
+              <div id="sensor-value" class="text-2xl font-mono mt-1">—</div>
+            </div>
+          </div>
+          <div class="bg-gray-900 rounded-lg p-4 border border-gray-800 h-80">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+        <div id="recommendations-panel" class="mt-8">
+          <h2 class="text-lg font-semibold mb-3">Recommended Work Orders</h2>
+          <div id="wo-list" class="space-y-3"></div>
+          <div id="no-recs" class="text-gray-500 text-sm hidden">No active recommendations. System is quiet.</div>
+        </div>
+      </div>
+    </main>
+    <div id="drawer" class="fixed inset-y-0 right-0 w-full max-w-md bg-gray-900 border-l border-gray-800 transform translate-x-full transition-transform duration-300 z-50 overflow-y-auto">
+      <div class="p-6">
+        <div class="flex justify-between items-start">
+          <h3 class="text-lg font-semibold" id="drawer-title">Work Order</h3>
+          <button onclick="closeDrawer()" class="text-gray-400 hover:text-white">✕</button>
+        </div>
+        <div id="drawer-body" class="mt-4 space-y-4 text-sm"></div>
+        <div id="drawer-actions" class="mt-6 flex gap-3"></div>
+      </div>
+    </div>
+    <div id="backdrop" class="fixed inset-0 bg-black/50 hidden z-40" onclick="closeDrawer()"></div>
+  </div>
+  <script>
+    const API = 'http://localhost:8000';
+    let chart = null;
+    let selectedAsset = null;
+    let currentWO = null;
+    async function loadAssets() {
+      const res = await fetch(`${API}/assets`);
+      const assets = await res.json();
+      const list = document.getElementById('asset-list');
+      list.innerHTML = '';
+      const groups = {};
+      assets.forEach(a => {
+        if (!groups[a.location]) groups[a.location] = [];
+        groups[a.location].push(a);
+      });
+      for (const [loc, items] of Object.entries(groups)) {
+        const header = document.createElement('div');
+        header.className = 'px-2 py-1 text-xs text-gray-500 font-medium';
+        header.textContent = loc;
+        list.appendChild(header);
+        items.forEach(a => {
+          const el = document.createElement('button');
+          el.className = `w-full text-left px-3 py-2 rounded text-sm flex items-center justify-between hover:bg-gray-800 ${a.id === 'P-204' ? 'bg-gray-800/50' : ''}`;
+          const statusColor = a.status === 'attention' ? 'text-amber-400' : a.status === 'sensor_issue' ? 'text-red-400' : 'text-emerald-400';
+          el.innerHTML = `<span>${a.id} · ${a.name}</span><span class="${statusColor} text-xs">${a.status}</span>`;
+          el.onclick = () => selectAsset(a);
+          list.appendChild(el);
+        });
+      }
+      const p204 = assets.find(a => a.id === 'P-204');
+      if (p204) selectAsset(p204);
+    }
+    async function selectAsset(asset) {
+      selectedAsset = asset;
+      document.getElementById('selected-asset').textContent = `${asset.id} · ${asset.name} (${asset.criticality})`;
+      document.getElementById('trend-panel').classList.remove('hidden');
+      const res = await fetch(`${API}/asset/${asset.id}/trends?hours=720`);
+      const data = await res.json();
+      document.getElementById('rms-value').textContent = data.vibration_rms.slice(-1)[0]?.toFixed(2) ?? '—';
+      document.getElementById('kurt-value').textContent = data.vibration_kurtosis.slice(-1)[0]?.toFixed(1) ?? '—';
+      document.getElementById('sensor-value').textContent = data.sensor_status.slice(-1)[0] ?? '—';
+      renderChart(data);
+      loadRecommendations();
+    }
+    function renderChart(data) {
+      const ctx = document.getElementById('trendChart').getContext('2d');
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.timestamps.filter((_, i) => i % 12 === 0),
+          datasets: [
+            { label: 'Vibration RMS', data: data.vibration_rms, borderColor: '#f59e0b', tension: 0.2, pointRadius: 0, yAxisID: 'y' },
+            { label: 'Kurtosis', data: data.vibration_kurtosis, borderColor: '#ef4444', tension: 0.2, pointRadius: 0, yAxisID: 'y1' },
+            { label: 'Temperature °C', data: data.temperature_c, borderColor: '#60a5fa', tension: 0.2, pointRadius: 0, yAxisID: 'y' }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#9ca3af' } } },
+          scales: {
+            x: { ticks: { color: '#6b7280', maxTicksLimit: 8 }, grid: { color: '#1f2937' } },
+            y: { ticks: { color: '#6b7280' }, grid: { color: '#1f2937' }, title: { display: true, text: 'RMS / °C', color: '#6b7280' } },
+            y1: { position: 'right', ticks: { color: '#6b7280' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Kurtosis', color: '#6b7280' } }
+          }
+        }
+      });
+    }
+    async function loadRecommendations() {
+      const res = await fetch(`${API}/recommendations`);
+      const recs = await res.json();
+      const list = document.getElementById('wo-list');
+      const none = document.getElementById('no-recs');
+      list.innerHTML = '';
+      if (recs.length === 0) {
+        none.classList.remove('hidden');
+        return;
+      }
+      none.classList.add('hidden');
+      recs.forEach(wo => {
+        const card = document.createElement('div');
+        card.className = 'bg-gray-900 border border-gray-800 rounded-lg p-4 cursor-pointer hover:border-gray-600';
+        card.innerHTML = `
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-medium">${wo.asset_id} · ${wo.failure_mode}</div>
+              <div class="text-xs text-gray-400 mt-1">${wo.urgency.toUpperCase()} · conf ${wo.confidence} · $${wo.dollar_impact.toLocaleString()}</div>
+            </div>
+            <span class="text-xs px-2 py-1 rounded bg-amber-900/40 text-amber-300">${wo.status}</span>
+          </div>
+          <div class="text-xs text-gray-500 mt-2">${wo.scheduled_window}</div>
+        `;
+        card.onclick = () => openDrawer(wo);
+        list.appendChild(card);
+      });
+    }
+    function openDrawer(wo) {
+      currentWO = wo;
+      document.getElementById('drawer-title').textContent = `${wo.id} · ${wo.asset_id}`;
+      document.getElementById('drawer-body').innerHTML = `
+        <div><span class="text-gray-400">Failure mode</span><div class="font-medium">${wo.failure_mode}</div></div>
+        <div><span class="text-gray-400">Evidence</span><div class="text-gray-300">${wo.evidence}</div></div>
+        <div><span class="text-gray-400">Procedure</span><div>${wo.procedure}</div></div>
+        <div><span class="text-gray-400">Spare parts</span><div>${wo.spare_parts}</div></div>
+        <div><span class="text-gray-400">Window</span><div>${wo.scheduled_window}</div></div>
+        <div><span class="text-gray-400">Production impact</span><div class="text-emerald-300">${wo.production_impact}</div></div>
+        <div class="grid grid-cols-2 gap-2">
+          <div><span class="text-gray-400">Confidence</span><div>${wo.confidence}</div></div>
+          <div><span class="text-gray-400">Dollar impact</span><div>$${wo.dollar_impact.toLocaleString()}</div></div>
+        </div>
+        <div class="text-xs text-gray-500">Model score: ${wo.model_score} · Type: ${wo.type}</div>
+      `;
+      const actions = document.getElementById('drawer-actions');
+      if (wo.status === 'recommended') {
+        actions.innerHTML = `
+          <button onclick="acceptWO()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-sm font-medium">Accept</button>
+          <button onclick="showOverride()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm">Override</button>
+        `;
+      } else {
+        actions.innerHTML = `<div class="text-sm text-gray-400">Status: ${wo.status}${wo.override_reason ? ' — ' + wo.override_reason : ''}</div>`;
+      }
+      document.getElementById('drawer').classList.remove('translate-x-full');
+      document.getElementById('backdrop').classList.remove('hidden');
+    }
+    function closeDrawer() {
+      document.getElementById('drawer').classList.add('translate-x-full');
+      document.getElementById('backdrop').classList.add('hidden');
+    }
+    async function acceptWO() {
+      const actor = prompt('Your name (planner):') || 'Planner';
+      await fetch(`${API}/work-order/accept`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ work_order_id: currentWO.id, actor })
+      });
+      closeDrawer();
+      loadRecommendations();
+    }
+    function showOverride() {
+      const reason = prompt('Override reason (required):');
+      if (!reason || reason.length < 5) return alert('Reason required');
+      const actor = prompt('Your name:') || 'Planner';
+      fetch(`${API}/work-order/override`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ work_order_id: currentWO.id, actor, reason })
+      }).then(() => {
+        closeDrawer();
+        loadRecommendations();
+      });
+    }
+    loadAssets();
+  </script>
+</body>
+</html>
