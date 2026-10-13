@@ -1,0 +1,112 @@
+[
+  {
+    "asset_type": "pump",
+    "failure_mode": "Outer race bearing wear",
+    "cause": "Fatigue / contamination",
+    "typical_task": "Replace bearing set, check lubrication and seals",
+    "typical_parts": "Bearing kit (SKF 6310 or equiv), seal kit, oil",
+    "urgency_base": "high",
+    "avg_repair_hours": 4.0,
+    "downtime_cost_per_hour": 2500
+  },
+  {
+    "asset_type": "pump",
+    "failure_mode": "Inner race bearing wear",
+    "cause": "Fatigue",
+    "typical_task": "Replace bearing set",
+    "typical_parts": "Bearing kit, seals",
+    "urgency_base": "high",
+    "avg_repair_hours": 4.0,
+    "downtime_cost_per_hour": 2500
+  },
+  {
+    "asset_type": "pump",
+    "failure_mode": "Impeller imbalance",
+    "cause": "Erosion / buildup",
+    "typical_task": "Clean or replace impeller, rebalance",
+    "typical_parts": "Impeller, gaskets, fasteners",
+    "urgency_base": "medium",
+    "avg_repair_hours": 6.0,
+    "downtime_cost_per_hour": 2500
+  },
+  {
+    "asset_type": "pump",
+    "failure_mode": "Misalignment",
+    "cause": "Installation / thermal growth",
+    "typical_task": "Realign coupling, check soft foot",
+    "typical_parts": "Shims, coupling elements",
+    "urgency_base": "medium",
+    "avg_repair_hours": 3.0,
+    "downtime_cost_per_hour": 2500
+  },
+  {
+    "asset_type": "pump",
+    "failure_mode": "Cavitation",
+    "cause": "NPSH insufficient",
+    "typical_task": "Inspect suction conditions, adjust operating point",
+    "typical_parts": "None immediate",
+    "urgency_base": "medium",
+    "avg_repair_hours": 2.0,
+    "downtime_cost_per_hour": 2500
+  },
+  {
+    "asset_type": "gearbox",
+    "failure_mode": "Tooth wear",
+    "cause": "Lubrication failure / overload",
+    "typical_task": "Inspect gears, change oil, replace if pitting severe",
+    "typical_parts": "Oil, filter, possible gear set",
+    "urgency_base": "high",
+    "avg_repair_hours": 8.0,
+    "downtime_cost_per_hour": 1800
+  },
+  {
+    "asset_type": "gearbox",
+    "failure_mode": "Bearing failure",
+    "cause": "Contamination",
+    "typical_task": "Replace bearings, flush and refill oil",
+    "typical_parts": "Bearing kit, oil, seals",
+    "urgency_base": "high",
+    "avg_repair_hours": 6.0,
+    "downtime_cost_per_hour": 1800
+  },
+  {
+    "asset_type": "compressor",
+    "failure_mode": "Valve leakage",
+    "cause": "Wear / carbon buildup",
+    "typical_task": "Replace valves, inspect cylinder",
+    "typical_parts": "Valve kit",
+    "urgency_base": "high",
+    "avg_repair_hours": 5.0,
+    "downtime_cost_per_hour": 3000
+  },
+  {
+    "asset_type": "compressor",
+    "failure_mode": "Bearing wear",
+    "cause": "Fatigue",
+    "typical_task": "Replace main bearings",
+    "typical_parts": "Bearing kit, oil",
+    "urgency_base": "critical",
+    "avg_repair_hours": 10.0,
+    "downtime_cost_per_hour": 3000
+  },
+  {
+    "asset_type": "conveyor",
+    "failure_mode": "Belt tracking issue",
+    "cause": "Misalignment / wear",
+    "typical_task": "Adjust tracking, inspect and replace rollers as needed",
+    "typical_parts": "Belt sections, rollers",
+    "urgency_base": "medium",
+    "avg_repair_hours": 4.0,
+    "downtime_cost_per_hour": 800
+  },
+  {
+    "asset_type": "conveyor",
+    "failure_mode": "Motor overload",
+    "cause": "Mechanical bind / jam",
+    "typical_task": "Clear jam, inspect drive train",
+    "typical_parts": "None",
+    "urgency_base": "medium",
+    "avg_repair_hours": 2.0,
+    "downtime_cost_per_hour": 800
+  }
+]
