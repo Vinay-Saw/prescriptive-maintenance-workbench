@@ -1,0 +1,38 @@
+[
+  {
+    "id": "P-101",
+    "name": "Cooling Water Pump",
+    "asset_type": "pump",
+    "location": "Utility Area",
+    "criticality": "medium",
+    "manufacturer": "Flowserve",
+    "model": "3196",
+    "install_date": "2018-03-15",
+    "rated_power_kw": 45,
+    "expected_mtbf_hours": 18000
+  },
+  {
+    "id": "P-102",
+    "name": "Process Feed Pump",
+    "asset_type": "pump",
+    "location": "Process Unit A",
+    "criticality": "high",
+    "manufacturer": "Sulzer",
+    "model": "OHH",
+    "install_date": "2019-06-20",
+    "rated_power_kw": 75,
+    "expected_mtbf_hours": 12000
+  },
+  {
+    "id": "P-204",
+    "name": "Main Process Pump",
+    "asset_type": "pump",
+    "location": "Process Unit B",
+    "criticality": "critical",
+    "manufacturer": "Flowserve",
+    "model": "3196",
+    "install_date": "2017-11-10",
+    "rated_power_kw": 110,
+    "expected_mtbf_hours": 10000
+  }
+]
